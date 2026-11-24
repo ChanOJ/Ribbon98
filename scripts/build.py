@@ -72,7 +72,7 @@ HOME_NOTE = (
     '<div id="archive-note" style="margin:20px auto 8px;padding:6px 8px 0;width:500px;'
     'border-top:1px solid #808080;text-align:center;font:11px/15px Verdana,Arial,Helvetica,sans-serif;'
     'color:#a0a0a0">Archive of the website of the demogroup .rIBBON! as it was on 1998-02-22. Read-only: '
-    "forms, e-mail links and counters no longer work. Full list of the old sites: "
+    "forms and counters no longer work. Full list of the old sites: "
     '<a href="https://chanoj.github.io/" style="color:#a0a0a0">chanoj.github.io</a>.</div>'
 )
 NOT_FOUND = """<HTML>
@@ -101,6 +101,15 @@ HREF, SRCATTR, BACKGROUND = ATTR("href"), ATTR("src"), ATTR("background")
 MAILTO_A = re.compile(r"""(?is)<a\b[^>]*href\s*=\s*["']?mailto:([^"'>\s?]+)[^>]*>(.*?)</a\s*>""")
 EMAIL = re.compile(r"(?i)\b([A-Za-z0-9._+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 AT_SIGN = "&#64;"
+# e-mail local parts that hold a family name (or are in doubt): only their domain is masked.
+# Nicks keep the full address (decision 2026-11-24).
+MASKED_LOCALS = {"cbouthor"}  # in doubt: the user is asked (2026-11-24)
+
+def mask_or_keep(address):
+    local, _, domain = address.partition("@")
+    if local.lower() in MASKED_LOCALS:
+        return local + AT_SIGN + "????"
+    return address
 
 def rd(p):
     return Path(p).read_bytes().decode(ENC)
@@ -145,7 +154,10 @@ class Site:
         """('url', published URL) | ('keep', href) | ('drop', None)."""
         href = href.strip()
         low = href.lower()
-        if low.startswith(("javascript:", "data:", "mailto:")):
+        if low.startswith("mailto:"):  # kept only for a full address (a masked one is text)
+            address = href[len("mailto:"):].split("?", 1)[0]
+            return ("keep", href) if mask_or_keep(address) == address else ("drop", None)
+        if low.startswith(("javascript:", "data:")):
             return "drop", None
         if low.startswith("#"):
             return "keep", href
@@ -250,9 +262,13 @@ class Site:
     def sanitize(self, rel, text):
         # e-mail links: text kept, address shown masked (the removal footer is added later)
         def mail(m):
-            local = m.group(1).split("@")[0]
+            address = m.group(1)
             label = re.sub(r"(?:&nbsp;|\s)+$", "", m.group(2))
-            return "%s (%s%s????)" % (label, local, AT_SIGN)
+            shown = mask_or_keep(address)
+            if shown != address:  # masked: text only, no link
+                return "%s (%s)" % (label, shown)
+            opening = re.match(r"(?is)<a\b[^>]*>", m.group(0)).group(0)  # full address: the mailto link stays
+            return "%s%s (%s)</a>" % (opening, label, address)
 
         text = MAILTO_A.sub(mail, text)
         if rel in FROZEN_PAGES:
@@ -260,7 +276,7 @@ class Site:
             text = re.sub(r"(?is)</form\s*>", "</div>", text)
             text = re.sub(r"(?is)<(input|select|textarea)\b", r"<\1 disabled", text)
             text = re.sub(r"(?is)(<body\b[^>]*>)", lambda m: m.group(1) + FORM_BANNER, text, count=1)
-        text = EMAIL.sub(lambda m: m.group(1) + AT_SIGN + "????", text)
+        text = EMAIL.sub(lambda m: mask_or_keep(m.group(0)), text)
         if not re.search(r"(?i)charset\s*=", text):
             text = re.sub(r"(?i)(<head[^>]*>)", r'\1<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">', text, count=1)
         return text
