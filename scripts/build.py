@@ -5,8 +5,10 @@
 
 Read-only on the raw store. Deterministic: the output only depends on the inputs.
 Paths are lowercased, `.htm` becomes `.html` (pages keep their original paths), links are
-rewritten to root-absolute paths, dead links become plain text, forms are frozen, e-mail
-addresses are masked as `local＠????`, and the demo archives in `prods/` are copied untouched.
+rewritten to root-absolute paths, external links keep their original `href` (only counters,
+forms and engine links are removed), forms are frozen, e-mail addresses are masked as
+`local@????`, pages are centred in an 800 px column, unreferenced files are left out, and the
+demo archives in `prods/` are copied untouched.
 """
 import argparse
 import os
@@ -35,9 +37,28 @@ ZIP_ALIASES = {
 # the page that links the demo archives: their .nfo files (kept untouched) show e-mail addresses
 FOOTER_PAGES = {"page/sjava/nos.htm"}
 FROZEN_PAGES = {"page/sjava/email.htm", "page/sjava/merci.htm"}
+# files of the 1998 capture that no page references (checked 2026-11-24): left out of site/
+ORPHANS = {
+    "prods/magic.com",  # byte-identical copy of Magic.com inside r_magic.zip
+    "page/dessin/banniere/ltpbann2.gif",
+    "page/dessin/banniere/ltpbanner.gif",
+    "page/dessin/banniere/ltpbanner2.gif",
+    "page/dessin/ecrans/0066.jpg",
+    "page/dessin/ecrans/0068.jpg",
+    "page/dessin/ecrans/0077.jpg",
+    "page/dessin/ecrans/0081.jpg",
+    "page/dessin/ecrans/0082.jpg",
+    "page/dessin/ecrans/0083.jpg",
+    "page/dessin/ecrans/1000.jpg",
+    "page/dessin/menus/bordure/main_m.jpg",
+}
+# links that the 1998 pages used for counters, forms or engine code: never published
+STRIPPED_LINK = re.compile(r"(?i)cgi|counter|icq|\.ctw|\.asp|\.inc\b")
+PAGE_WIDTH = 800  # px: the site is limited to an 800 px column, centred
 
 REMOVAL_NOTE = (
-    '<div id="removal-note" style="clear:both;margin:28px auto 8px;padding:6px 8px 0;width:60%;'
+    '<div id="removal-note" style="clear:both;margin:28px auto 8px;padding:6px 8px 0;'
+    'width:775px;max-width:96%;'
     'border-top:1px solid #808080;text-align:center;font:10px/14px Verdana,Arial,Helvetica,sans-serif;'
     'color:#808080;background:transparent">To be removed from this page, '
     '<a href="mailto:chandra_oj@pm.me" style="color:#808080;text-decoration:underline">contact me</a>.</div>'
@@ -79,7 +100,7 @@ ATTR = lambda name: re.compile(r"""(?is)(\s%s\s*=\s*)(?:"([^"]*)"|'([^']*)'|([^\
 HREF, SRCATTR, BACKGROUND = ATTR("href"), ATTR("src"), ATTR("background")
 MAILTO_A = re.compile(r"""(?is)<a\b[^>]*href\s*=\s*["']?mailto:([^"'>\s?]+)[^>]*>(.*?)</a\s*>""")
 EMAIL = re.compile(r"(?i)\b([A-Za-z0-9._+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
-FULLWIDTH_AT = "&#65312;"
+AT_SIGN = "&#64;"
 
 def rd(p):
     return Path(p).read_bytes().decode(ENC)
@@ -104,7 +125,7 @@ class Site:
             for f in sorted(fs):
                 p = Path(r, f)
                 rel = p.relative_to(self.root).as_posix().lower()
-                if f == ".DS_Store" or rel.endswith(DROP_EXT):
+                if f == ".DS_Store" or rel.endswith(DROP_EXT) or rel in ORPHANS:
                     continue
                 self.files[rel] = p
         for rel in self.files:
@@ -128,6 +149,7 @@ class Site:
             return "drop", None
         if low.startswith("#"):
             return "keep", href
+        external = href  # kept as written when the link goes outside the archive
         frag = ""
         if "#" in href:
             href, _, frag = href.partition("#")
@@ -145,7 +167,10 @@ class Site:
                     r = self.lookup(path[len("ribbon/"):])
                     if r:
                         return "url", r + frag
-            return "drop", None
+            # other external links: kept as written (a dead one stays a link, a click may fail)
+            if STRIPPED_LINK.search(external):
+                return "drop", None
+            return "keep", external
         path = unquote(href.split("?", 1)[0]).replace("\\", "/")
         if path == "":
             return "drop", None
@@ -227,7 +252,7 @@ class Site:
         def mail(m):
             local = m.group(1).split("@")[0]
             label = re.sub(r"(?:&nbsp;|\s)+$", "", m.group(2))
-            return "%s (%s%s????)" % (label, local, FULLWIDTH_AT)
+            return "%s (%s%s????)" % (label, local, AT_SIGN)
 
         text = MAILTO_A.sub(mail, text)
         if rel in FROZEN_PAGES:
@@ -235,10 +260,30 @@ class Site:
             text = re.sub(r"(?is)</form\s*>", "</div>", text)
             text = re.sub(r"(?is)<(input|select|textarea)\b", r"<\1 disabled", text)
             text = re.sub(r"(?is)(<body\b[^>]*>)", lambda m: m.group(1) + FORM_BANNER, text, count=1)
-        text = EMAIL.sub(lambda m: m.group(1) + FULLWIDTH_AT + "????", text)
+        text = EMAIL.sub(lambda m: m.group(1) + AT_SIGN + "????", text)
         if not re.search(r"(?i)charset\s*=", text):
             text = re.sub(r"(?i)(<head[^>]*>)", r'\1<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">', text, count=1)
         return text
+
+    @staticmethod
+    def centre(text):
+        """Put the page in a centred column of PAGE_WIDTH px; a body background tile moves to the column."""
+        m = re.search(r"(?is)<body\b([^>]*)>", text)
+        if not m:
+            return text
+        attrs = m.group(1)
+        style = "max-width:%dpx;margin:0 auto" % PAGE_WIDTH
+        bg = re.search(r'(?i)\sbackground\s*=\s*"([^"]*)"', attrs)
+        if bg:
+            style += ";background-image:url('%s')" % bg.group(1)
+            attrs = re.sub(r'(?i)\sbackground\s*=\s*"[^"]*"', "", attrs)
+        opening = '<body%s><div id="page-column" style="%s">' % (attrs, style)
+        text = text[:m.start()] + opening + text[m.end():]
+        end = list(re.finditer(r"(?is)</body\s*>", text))
+        if end:
+            pos = end[-1].start()
+            return text[:pos] + "</div>\n" + text[pos:]
+        return text + "\n</div>\n"
 
     @staticmethod
     def _append(text, note):
@@ -255,8 +300,8 @@ class Site:
             p = self.files[rel]
             d = out / self.dest[rel]
             if rel.endswith((".htm", ".html")):
-                text = self.rewrite(rel, self.sanitize(rel, rd(p)))
-                if FULLWIDTH_AT + "????" in text or rel in FOOTER_PAGES:  # e-mail local part shown, or demo archives linked
+                text = self.centre(self.rewrite(rel, self.sanitize(rel, rd(p))))
+                if AT_SIGN + "????" in text or rel in FOOTER_PAGES:  # e-mail local part shown, or demo archives linked
                     text = self._append(text, REMOVAL_NOTE)
                 if rel == "index.htm":
                     text = self._append(text, HOME_NOTE)

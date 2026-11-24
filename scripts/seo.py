@@ -34,6 +34,9 @@ TAG = b'<script src="/frame-restore.js"></script>'
 NOT_FOUND_NAMES = {"404.htm", "404.html"}
 # Alternative skins (/skin/<name>/...) duplicate the pages of the default one: not listed in the sitemap.
 SKIP_PREFIXES = ("skin/",)
+# Pages reachable by their URL only (linked from no page): frozen mailing-list form and its
+# "thank you" page. Kept online, not listed in the sitemap (2026-11-24 audit).
+NOT_LISTED = {"page/sjava/email.html", "page/sjava/merci.html"}
 
 
 def html_files(site):
@@ -66,7 +69,7 @@ def write_sitemaps(site, host):
     urls = []
     for p in html_files(site):
         rel = p.relative_to(site).as_posix()
-        if rel.lower() in NOT_FOUND_NAMES or rel.startswith(SKIP_PREFIXES) or not indexable(p):
+        if rel.lower() in NOT_FOUND_NAMES or rel.startswith(SKIP_PREFIXES) or rel in NOT_LISTED or not indexable(p):
             continue
         urls.append("/" if rel.lower() in ("index.html", "index.htm") else "/" + quote(rel))
     for old in site.glob("sitemap*.xml"):
