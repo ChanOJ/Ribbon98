@@ -30,7 +30,8 @@ LEFTOVERS = [
     ("form tag", re.compile(r"(?i)<form\b")),
     ("password input", re.compile(r"(?i)<input[^>]*type\s*=\s*\"?password[^>]*value")),
     ("asp tag", re.compile(r"<%")),
-    ("mailto", re.compile(r"(?i)(?<![a-z])mailto:")),
+    ("mailto to a non-nick address", re.compile(
+        r"(?i)(?<![a-z])mailto:(?!(?:%s)[@?\"'])" % "|".join(NICK_LOCALS))),
     ("e-mail address", EMAIL),
     ("phone number", PHONE),
     ("age + postcode", AGE),

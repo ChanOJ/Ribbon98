@@ -72,7 +72,7 @@ HOME_NOTE = (
     '<div id="archive-note" style="margin:20px auto 8px;padding:6px 8px 0;width:500px;'
     'border-top:1px solid #808080;text-align:center;font:11px/15px Verdana,Arial,Helvetica,sans-serif;'
     'color:#a0a0a0">Archive of the website of the demogroup .rIBBON! as it was on 1998-02-22. Read-only: '
-    "forms, e-mail links and counters no longer work. Full list of the old sites: "
+    "forms and counters no longer work. Full list of the old sites: "
     '<a href="https://chanoj.github.io/" style="color:#a0a0a0">chanoj.github.io</a>.</div>'
 )
 NOT_FOUND = """<HTML>
@@ -154,7 +154,10 @@ class Site:
         """('url', published URL) | ('keep', href) | ('drop', None)."""
         href = href.strip()
         low = href.lower()
-        if low.startswith(("javascript:", "data:", "mailto:")):
+        if low.startswith("mailto:"):  # kept only for a full address (a masked one is text)
+            address = href[len("mailto:"):].split("?", 1)[0]
+            return ("keep", href) if mask_or_keep(address) == address else ("drop", None)
+        if low.startswith(("javascript:", "data:")):
             return "drop", None
         if low.startswith("#"):
             return "keep", href
@@ -261,7 +264,11 @@ class Site:
         def mail(m):
             address = m.group(1)
             label = re.sub(r"(?:&nbsp;|\s)+$", "", m.group(2))
-            return "%s (%s)" % (label, mask_or_keep(address))
+            shown = mask_or_keep(address)
+            if shown != address:  # masked: text only, no link
+                return "%s (%s)" % (label, shown)
+            opening = re.match(r"(?is)<a\b[^>]*>", m.group(0)).group(0)  # full address: the mailto link stays
+            return "%s%s (%s)</a>" % (opening, label, address)
 
         text = MAILTO_A.sub(mail, text)
         if rel in FROZEN_PAGES:
