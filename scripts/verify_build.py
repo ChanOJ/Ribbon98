@@ -12,7 +12,6 @@ import argparse
 import os
 import re
 import sys
-import zipfile
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -24,8 +23,6 @@ EMAIL = re.compile(r"[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 IPV4 = re.compile(r"(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\d.])")
 PHONE = re.compile(r"\b0\d(?:[. ]\d\d){4}\b")
 AGE = re.compile(r"(?i)\b\d{1,3}\s*ans\s*-\s*\d{5}")
-ZMAIL = re.compile(rb"[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|net|org|edu|fr|se|fi|be|nl|de|uk)\b", re.I)
-ZPHONE = re.compile(rb"(?:\+\d\d[ .(-]*\(?0?\)?[ .-]*\d(?:[ .-]*\d){7,9}|\b0\d[ .-]+\d\d(?:[ .-]+\d\d){3}\b)")
 LEFTOVERS = [
     ("tppabs/tppmsgs", re.compile(r"(?i)tppabs|tppmsgs")),
     ("form tag", re.compile(r"(?i)<form\b")),
@@ -98,22 +95,6 @@ def main(argv=None):
                     cands = [pre + "index.html"]
                 if not any(c in fset for c in cands):
                     broken.append("%s -> %s" % (rel, raw))
-    # demo archives: no e-mail address or phone number left in the text members
-    zbad = []
-    for rel in files:
-        if rel.endswith(".zip"):
-            with zipfile.ZipFile(build / rel) as z:
-                if z.testzip():
-                    zbad.append(rel + ": corrupt")
-                for n in z.namelist():
-                    if n.lower().endswith((".nfo", ".txt", ".diz", ".xm", ".s3m", ".mod", ".exe")):
-                        d = z.read(n)
-                        for m in ZMAIL.finditer(d):
-                            zbad.append("%s:%s: %s" % (rel, n, m.group(0)[:40]))
-                        for m in ZPHONE.finditer(d):
-                            zbad.append("%s:%s: %s" % (rel, n, m.group(0)[:40]))
-    if zbad:
-        fail("e-mail or phone left in demo archives", zbad)
     for label, items in hits.items():
         fail("leftover '%s' in" % label, items)
     if ips:

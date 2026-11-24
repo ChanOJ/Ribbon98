@@ -15,11 +15,13 @@ Full list of the sites: https://chanoj.github.io/
 ./publish.sh
 ```
 
-It runs `scripts/build.py` (lowercase names, `.htm` -> `.html`, pages kept at their original paths, links rewritten, dead links turned into plain text, the mailing-list form frozen, e-mail addresses masked as `local＠????`, e-mail addresses and phone numbers masked inside the `.nfo`/`.txt`/module files of the demo archives), `scripts/seo.py` (`robots.txt`, `sitemap.xml`), `scripts/verify_build.py` and `scripts/check_excludes.py`. It never deploys: merging to `main` does, through GitHub Actions.
+It runs `scripts/build.py` (lowercase names, `.htm` -> `.html`, pages kept at their original paths, links rewritten, dead links turned into plain text, the mailing-list form frozen, e-mail addresses masked as `local＠????`), `scripts/seo.py` (`robots.txt`, `sitemap.xml`), `scripts/verify_build.py` and `scripts/check_excludes.py`. It never deploys: merging to `main` does, through GitHub Actions.
+
+The demo archives in `prods/` are kept exactly as they were (their `.nfo` files show e-mail addresses): the page that links them carries the removal footer.
 
 Never published: engine code and counters (`.ctw`), the older 1997-11 copy of the site (`ribbon.anc`, a different layout).
 
-Pages that list people end with "To be removed from this page, contact me."
+Pages showing an e-mail local part (or a family name, or a postal address) end with "To be removed from this page, contact me."
 
 ## Layout
 
