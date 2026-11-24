@@ -34,10 +34,6 @@ ZIP_ALIASES = {
     "prods/ltn_ccn.zip": "prods/ltp_ccn.zip",
     "prods/ltp2tro.zip": "prods/ltp2zen.zip",
 }
-REMOVAL_PAGES = {
-    "credits.htm", "page/sjava/contact.htm", "page/sjava/greets.htm", "page/sjava/history.htm",
-    "page/sjava/nos.htm", "page/sjava/ltp.htm", "page/sjava/ltp2.html", "page/sjava/sid.htm",
-}
 FROZEN_PAGES = {"page/sjava/email.htm", "page/sjava/merci.htm"}
 
 REMOVAL_NOTE = (
@@ -303,7 +299,7 @@ class Site:
             d = out / self.dest[rel]
             if rel.endswith((".htm", ".html")):
                 text = self.rewrite(rel, self.sanitize(rel, rd(p)))
-                if rel in REMOVAL_PAGES:
+                if FULLWIDTH_AT + "????" in text:  # footer only where an e-mail local part shows
                     text = self._append(text, REMOVAL_NOTE)
                 if rel == "index.htm":
                     text = self._append(text, HOME_NOTE)

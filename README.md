@@ -19,7 +19,7 @@ It runs `scripts/build.py` (lowercase names, `.htm` -> `.html`, pages kept at th
 
 Never published: engine code and counters (`.ctw`), the older 1997-11 copy of the site (`ribbon.anc`, a different layout).
 
-Pages that list people end with "To be removed from this page, contact me."
+Pages showing an e-mail local part (or a family name, or a postal address) end with "To be removed from this page, contact me."
 
 ## Layout
 
