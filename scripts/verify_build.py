@@ -19,7 +19,9 @@ ENC = "iso-8859-1"
 REPO = Path(__file__).resolve().parent.parent
 LINK = re.compile(r"""(?ix)\b(?:href|src|background)\s*=\s*(?:(["'])(.*?)\1|([^\s"'>]+))""")
 REMOVAL = re.compile(r'(?s)<div id="removal-note".*?</div>')
-EMAIL = re.compile(r"[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+# nick addresses are published on purpose (2026-11-24 decision); any other address is a leak
+NICK_LOCALS = ("drribbon", "poi_ribbon", "ribbon", "geek", "frigo", "lluvia", "kenetribbon", "selfmail", "dreynald")
+EMAIL = re.compile(r"(?<![A-Za-z0-9._+-])(?!(?:%s)@)[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+" % "|".join(NICK_LOCALS), re.I)
 IPV4 = re.compile(r"(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\d.])")
 PHONE = re.compile(r"\b0\d(?:[. ]\d\d){4}\b")
 AGE = re.compile(r"(?i)\b\d{1,3}\s*ans\s*-\s*\d{5}")

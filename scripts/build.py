@@ -101,6 +101,15 @@ HREF, SRCATTR, BACKGROUND = ATTR("href"), ATTR("src"), ATTR("background")
 MAILTO_A = re.compile(r"""(?is)<a\b[^>]*href\s*=\s*["']?mailto:([^"'>\s?]+)[^>]*>(.*?)</a\s*>""")
 EMAIL = re.compile(r"(?i)\b([A-Za-z0-9._+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 AT_SIGN = "&#64;"
+# e-mail local parts that hold a family name (or are in doubt): only their domain is masked.
+# Nicks keep the full address (decision 2026-11-24).
+MASKED_LOCALS = {"cbouthor"}  # in doubt: the user is asked (2026-11-24)
+
+def mask_or_keep(address):
+    local, _, domain = address.partition("@")
+    if local.lower() in MASKED_LOCALS:
+        return local + AT_SIGN + "????"
+    return address
 
 def rd(p):
     return Path(p).read_bytes().decode(ENC)
@@ -250,9 +259,9 @@ class Site:
     def sanitize(self, rel, text):
         # e-mail links: text kept, address shown masked (the removal footer is added later)
         def mail(m):
-            local = m.group(1).split("@")[0]
+            address = m.group(1)
             label = re.sub(r"(?:&nbsp;|\s)+$", "", m.group(2))
-            return "%s (%s%s????)" % (label, local, AT_SIGN)
+            return "%s (%s)" % (label, mask_or_keep(address))
 
         text = MAILTO_A.sub(mail, text)
         if rel in FROZEN_PAGES:
@@ -260,7 +269,7 @@ class Site:
             text = re.sub(r"(?is)</form\s*>", "</div>", text)
             text = re.sub(r"(?is)<(input|select|textarea)\b", r"<\1 disabled", text)
             text = re.sub(r"(?is)(<body\b[^>]*>)", lambda m: m.group(1) + FORM_BANNER, text, count=1)
-        text = EMAIL.sub(lambda m: m.group(1) + AT_SIGN + "????", text)
+        text = EMAIL.sub(lambda m: mask_or_keep(m.group(0)), text)
         if not re.search(r"(?i)charset\s*=", text):
             text = re.sub(r"(?i)(<head[^>]*>)", r'\1<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">', text, count=1)
         return text
