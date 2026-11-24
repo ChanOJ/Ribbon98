@@ -15,7 +15,7 @@ Full list of the sites: https://chanoj.github.io/
 ./publish.sh
 ```
 
-It runs `scripts/build.py` (lowercase names, `.htm` -> `.html`, pages kept at their original paths, links rewritten, dead links turned into plain text, the mailing-list form frozen, e-mail addresses masked as `local＠????`), `scripts/seo.py` (`robots.txt`, `sitemap.xml`), `scripts/verify_build.py` and `scripts/check_excludes.py`. It never deploys: merging to `main` does, through GitHub Actions.
+It runs `scripts/build.py` (lowercase names, `.htm` -> `.html`, pages kept at their original paths, links rewritten, external links kept as written, counters and forms removed, the mailing-list form frozen, e-mail addresses masked as `local@????`, pages centred in an 800 px column, unreferenced files left out), `scripts/seo.py` (`robots.txt`, `sitemap.xml`), `scripts/verify_build.py` and `scripts/check_excludes.py`. It never deploys: merging to `main` does, through GitHub Actions.
 
 The demo archives in `prods/` are kept exactly as they were (their `.nfo` files show e-mail addresses): the page that links them carries the removal footer.
 
