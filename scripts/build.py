@@ -6,15 +6,13 @@
 Read-only on the raw store. Deterministic: the output only depends on the inputs.
 Paths are lowercased, `.htm` becomes `.html` (pages keep their original paths), links are
 rewritten to root-absolute paths, dead links become plain text, forms are frozen, e-mail
-addresses are masked as `local＠????`, and the demo archives in `prods/` are rebuilt with
-e-mail addresses and phone numbers masked inside their files.
+addresses are masked as `local＠????`, and the demo archives in `prods/` are copied untouched.
 """
 import argparse
 import os
 import re
 import shutil
 import sys
-import zipfile
 from pathlib import Path
 from posixpath import normpath, join as pjoin, dirname
 from urllib.parse import unquote, urlsplit
@@ -34,6 +32,8 @@ ZIP_ALIASES = {
     "prods/ltn_ccn.zip": "prods/ltp_ccn.zip",
     "prods/ltp2tro.zip": "prods/ltp2zen.zip",
 }
+# the page that links the demo archives: their .nfo files (kept untouched) show e-mail addresses
+FOOTER_PAGES = {"page/sjava/nos.htm"}
 FROZEN_PAGES = {"page/sjava/email.htm", "page/sjava/merci.htm"}
 
 REMOVAL_NOTE = (
@@ -81,13 +81,6 @@ MAILTO_A = re.compile(r"""(?is)<a\b[^>]*href\s*=\s*["']?mailto:([^"'>\s?]+)[^>]*
 EMAIL = re.compile(r"(?i)\b([A-Za-z0-9._+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 FULLWIDTH_AT = "&#65312;"
 
-# masking inside the demo archives (bytes, same length so that nothing shifts)
-B_EMAIL = re.compile(rb"([A-Za-z0-9._+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:com|net|org|edu|fr|se|fi|be|nl|de|uk|mail))\b", re.I)
-# members that can hold text; image/data members are left untouched (digits there are not phone numbers)
-MASK_EXT = (".nfo", ".txt", ".diz", ".exe", ".com", ".xm", ".s3m", ".mod", ".mxm", ".asc", ".doc")
-B_PHONE = re.compile(rb"(?:\+\d\d[ .(-]*\(?0?\)?[ .-]*\d(?:[ .-]*\d){7,9}|\b0\d[ .-]+(?:-\s*)?\d\d(?:[ .-]+\d\d){3}\b)")
-
-
 def rd(p):
     return Path(p).read_bytes().decode(ENC)
 
@@ -99,41 +92,6 @@ def wr(p, text):
 
 def attr_value(m):
     return next(g for g in m.groups()[1:] if g is not None)
-
-
-def mask_bytes(data):
-    """Mask e-mail addresses and phone numbers in a binary/text file, keeping its length."""
-    n = [0]
-
-    def mail(m):
-        n[0] += 1
-        return m.group(1) + b"@" + b"?" * len(m.group(2))
-
-    def phone(m):
-        n[0] += 1
-        return re.sub(rb"\d", b"?", m.group(0))
-
-    data = B_EMAIL.sub(mail, data)
-    data = B_PHONE.sub(phone, data)
-    return data, n[0]
-
-
-def rebuild_zip(src, dst, log):
-    """Copy a zip with every member masked; same names, dates and order, deterministic."""
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(src) as zi, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zo:
-        for info in zi.infolist():
-            if info.is_dir():
-                zo.writestr(info, b"")
-                continue
-            data = zi.read(info.filename)
-            new, n = mask_bytes(data) if info.filename.lower().endswith(MASK_EXT) else (data, 0)
-            if n:
-                log.append("%s: %s (%d masked)" % (src.name, info.filename, n))
-            ni = zipfile.ZipInfo(info.filename, info.date_time)
-            ni.compress_type = zipfile.ZIP_DEFLATED
-            ni.external_attr = info.external_attr
-            zo.writestr(ni, new)
 
 
 class Site:
@@ -293,24 +251,21 @@ class Site:
         if out.exists():
             shutil.rmtree(out)
         out.mkdir(parents=True)
-        zlog = []
         for rel in sorted(self.files):
             p = self.files[rel]
             d = out / self.dest[rel]
             if rel.endswith((".htm", ".html")):
                 text = self.rewrite(rel, self.sanitize(rel, rd(p)))
-                if FULLWIDTH_AT + "????" in text:  # footer only where an e-mail local part shows
+                if FULLWIDTH_AT + "????" in text or rel in FOOTER_PAGES:  # e-mail local part shown, or demo archives linked
                     text = self._append(text, REMOVAL_NOTE)
                 if rel == "index.htm":
                     text = self._append(text, HOME_NOTE)
                 wr(d, text)
-            elif rel.endswith(".zip"):
-                rebuild_zip(p, d, zlog)
             else:
                 d.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(p, d)
         wr(out / "404.html", NOT_FOUND)
-        return len(self.files) + 1, zlog
+        return len(self.files) + 1
 
 
 def main(argv=None):
@@ -319,11 +274,8 @@ def main(argv=None):
     ap.add_argument("--out", default=str(REPO / "site"))
     a = ap.parse_args(argv)
     s = Site(a.raw)
-    n, zlog = s.run(Path(a.out))
+    n = s.run(Path(a.out))
     print("build: %d files in %s" % (n, a.out))
-    print("masked inside demo archives: %d members" % len(zlog))
-    for z in zlog:
-        print("   ", z)
     un = {k: sorted(v)[:2] for k, v in sorted(s.unresolved.items())}
     print("unresolved link targets (made plain text): %d" % len(un))
     for k, v in un.items():
