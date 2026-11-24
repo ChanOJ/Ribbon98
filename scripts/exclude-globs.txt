@@ -1,0 +1,17 @@
+# Files that must NOT be published (relative to site/; no '/' = basename anywhere; '*' crosses '/').
+# Read by scripts/check_excludes.py and scripts/verify_build.py.
+.DS_Store
+Thumbs.db
+*.log
+# engine code and binaries of the old server (the demos are zip archives and one .com in prods/)
+*.asp
+*.inc
+*.dll
+*.exe
+*.bat
+*.cgi
+*.ctw
+*.psd
+# credentials, visitor data
+*passw*
+*logins*

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ribbon98.sauthier.family/sitemap.xml

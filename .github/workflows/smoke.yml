@@ -1,0 +1,19 @@
+name: "Monitoring: weekly smoke test"
+
+# Weekly check that the public site serves the files of site/. A failure sends
+# GitHub's usual "workflow run failed" notification.
+
+on:
+  schedule:
+    - cron: "41 5 * * 1" # every Monday at 05:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 scripts/smoke_test.py

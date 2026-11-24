@@ -1,0 +1,40 @@
+.DS_Store
+
+# Secrets: never committed. Secret values live in Proton Pass (vault OldSites)
+# and in GitHub secrets; infra/secrets.env only holds Proton Pass references.
+.env
+.env.*
+*.env
+!infra/secrets.env
+*.tfvars
+*.tfvars.json
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# OpenTofu
+.terraform/
+*.tfstate
+# The state is encrypted (infra/encryption.tf, enforced) and shared through git.
+!infra/terraform.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Python
+__pycache__/
+
+# Scratch
+tmp/
+
+# Claude Code: personal settings. .claude/launch.json is shared.
+.claude/settings.local.json
