@@ -69,6 +69,117 @@ resource "bunnynet_pullzone_hostname" "this" {
   force_ssl   = true
 }
 
+# Edge rules: read-only, security headers, isolation, archives as downloads
+# (same model as the other archives). The pages are plain HTML (no script, no
+# form, no remote resource; only outbound links), so the CSP is strict.
+locals {
+  csp = join("; ", [
+    "default-src 'self'",
+    "script-src 'none'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "media-src 'self'",
+    "font-src 'self'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "frame-ancestors 'self'",
+    "form-action 'none'",
+    "base-uri 'self'",
+    "connect-src 'self'",
+  ])
+
+  archive_extensions = ["rar", "zip", "lha", "arj", "exe", "com"]
+}
+
+# 1. Anything but GET/HEAD/OPTIONS is refused at the edge, before the origin.
+resource "bunnynet_pullzone_edgerule" "read_only" {
+  pullzone    = bunnynet_pullzone.this.id
+  description = "Read-only: block every method except GET, HEAD, OPTIONS"
+  enabled     = true
+  priority    = 1
+  match_type  = "MatchAll"
+
+  triggers = [{
+    type       = "RequestMethod"
+    match_type = "MatchNone"
+    patterns   = ["GET", "HEAD", "OPTIONS"]
+    parameter1 = null
+    parameter2 = null
+  }]
+
+  actions = [{ type = "BlockRequest", parameter1 = null, parameter2 = null, parameter3 = null }]
+}
+
+# 2. Security headers on every response.
+resource "bunnynet_pullzone_edgerule" "security_headers" {
+  pullzone    = bunnynet_pullzone.this.id
+  description = "Security headers"
+  enabled     = true
+  priority    = 2
+  match_type  = "MatchAny"
+
+  triggers = [{
+    type       = "Url"
+    match_type = "MatchAny"
+    patterns   = ["*"]
+    parameter1 = null
+    parameter2 = null
+  }]
+
+  actions = [
+    { type = "SetResponseHeader", parameter1 = "Content-Security-Policy", parameter2 = local.csp, parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "X-Content-Type-Options", parameter2 = "nosniff", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "Referrer-Policy", parameter2 = "no-referrer", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "X-Frame-Options", parameter2 = "SAMEORIGIN", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "Strict-Transport-Security", parameter2 = "max-age=31536000", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "Permissions-Policy", parameter2 = "camera=(), microphone=(), geolocation=(), payment=()", parameter3 = null },
+  ]
+}
+
+# 2b. Cross-origin isolation.
+resource "bunnynet_pullzone_edgerule" "isolation" {
+  pullzone    = bunnynet_pullzone.this.id
+  description = "Cross-origin isolation (COOP/CORP)"
+  enabled     = true
+  priority    = 3
+  match_type  = "MatchAny"
+
+  triggers = [{
+    type       = "Url"
+    match_type = "MatchAny"
+    patterns   = ["*"]
+    parameter1 = null
+    parameter2 = null
+  }]
+
+  actions = [
+    { type = "SetResponseHeader", parameter1 = "Cross-Origin-Opener-Policy", parameter2 = "same-origin", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "Cross-Origin-Resource-Policy", parameter2 = "same-origin", parameter3 = null },
+  ]
+}
+
+# 3. Untrusted legacy archives/binaries: never interpreted, always downloaded.
+resource "bunnynet_pullzone_edgerule" "archives" {
+  pullzone    = bunnynet_pullzone.this.id
+  description = "Archives: octet-stream + Content-Disposition attachment"
+  enabled     = true
+  priority    = 4
+  match_type  = "MatchAny"
+
+  triggers = [{
+    type       = "UrlExtension"
+    match_type = "MatchAny"
+    patterns   = local.archive_extensions
+    parameter1 = null
+    parameter2 = null
+  }]
+
+  actions = [
+    { type = "SetResponseHeader", parameter1 = "Content-Type", parameter2 = "application/octet-stream", parameter3 = null },
+    { type = "SetResponseHeader", parameter1 = "Content-Disposition", parameter2 = "attachment", parameter3 = null },
+  ]
+}
+
 output "storage_zone_name" {
   value = bunnynet_storage_zone.this.name
 }

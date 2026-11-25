@@ -1,6 +1,6 @@
 name: "Website: deploy"
 
-# - Push to main touching site/: sync site/ to the storage zone, purge the CDN,
+# - Push to main touching site/: ClamAV scan, then sync site/ to the storage zone, purge the CDN,
 #   then check the public site. Changes of site.json (e.g. a renamed zone) are
 #   deployed by the infra apply instead, once the zone exists.
 # - Manual run: same, optionally as a dry run.
@@ -39,6 +39,14 @@ jobs:
       MASS_DELETE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_mass_delete }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Malware scan (ClamAV)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clamav
+          sudo systemctl stop clamav-freshclam || true
+          sudo freshclam --quiet
+          clamscan -r --infected --no-summary site/ || { echo "::error::ClamAV flagged files"; exit 1; }
 
       - name: Sync to the storage zone and purge the cache
         id: sync
