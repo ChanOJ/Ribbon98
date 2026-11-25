@@ -88,7 +88,7 @@ locals {
     "connect-src 'self'",
   ])
 
-  archive_extensions = ["rar", "zip", "lha", "arj", "exe", "com"]
+  archive_extensions = ["rar", "zip", "lha", "arj", "exe"]
 }
 
 # 1. Anything but GET/HEAD/OPTIONS is refused at the edge, before the origin.
